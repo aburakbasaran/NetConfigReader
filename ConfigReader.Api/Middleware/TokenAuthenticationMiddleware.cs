@@ -25,6 +25,14 @@ public sealed class TokenAuthenticationMiddleware
         "/api/configuration/appsettings"
     };
 
+    /// <summary>
+    /// Authentication gerekli olmayan endpoint'ler (token endpoint'leri)
+    /// </summary>
+    private static readonly string[] PublicEndpoints = 
+    {
+        "/api/token"
+    };
+
     public TokenAuthenticationMiddleware(
         RequestDelegate next,
         ILogger<TokenAuthenticationMiddleware> logger,
@@ -93,6 +101,13 @@ public sealed class TokenAuthenticationMiddleware
     {
         if (string.IsNullOrEmpty(path))
             return false;
+
+        // Public endpoint'leri kontrol et
+        if (PublicEndpoints.Any(endpoint => 
+            path.StartsWith(endpoint, StringComparison.OrdinalIgnoreCase)))
+        {
+            return false;
+        }
 
         return AuthenticatedEndpoints.Any(endpoint => 
             path.StartsWith(endpoint, StringComparison.OrdinalIgnoreCase));

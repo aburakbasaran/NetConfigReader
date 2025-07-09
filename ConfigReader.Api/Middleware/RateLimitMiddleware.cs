@@ -22,6 +22,14 @@ public sealed class RateLimitMiddleware
         "/api/configuration/appsettings"
     };
 
+    /// <summary>
+    /// Rate limiting uygulanmayacak path'ler (token endpoint'leri)
+    /// </summary>
+    private static readonly string[] ExcludedPaths = 
+    {
+        "/api/token"
+    };
+
     public RateLimitMiddleware(
         RequestDelegate next,
         IRateLimitService rateLimitService,
@@ -83,6 +91,13 @@ public sealed class RateLimitMiddleware
     {
         if (string.IsNullOrEmpty(path))
             return false;
+
+        // Excluded path'leri kontrol et
+        if (ExcludedPaths.Any(excludedPath => 
+            path.StartsWith(excludedPath, StringComparison.OrdinalIgnoreCase)))
+        {
+            return false;
+        }
 
         return ProtectedPaths.Any(protectedPath => 
             path.StartsWith(protectedPath, StringComparison.OrdinalIgnoreCase));

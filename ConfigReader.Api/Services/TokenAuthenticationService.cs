@@ -1,4 +1,5 @@
 using ConfigReader.Api.Models;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Options;
 using System.Security.Cryptography;
 using System.Text;
@@ -14,6 +15,7 @@ public sealed class TokenAuthenticationService : ITokenAuthenticationService
     private readonly ILogger<TokenAuthenticationService> _logger;
     private readonly ConfigReaderApiOptions _options;
     private readonly string[] _hashedTokens;
+    private readonly IMemoryCache _memoryCache;
 
     /// <summary>
     /// Minimum token uzunluğu
@@ -32,10 +34,12 @@ public sealed class TokenAuthenticationService : ITokenAuthenticationService
 
     public TokenAuthenticationService(
         ILogger<TokenAuthenticationService> logger,
-        IOptions<ConfigReaderApiOptions> options)
+        IOptions<ConfigReaderApiOptions> options,
+        IMemoryCache memoryCache)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _options = options?.Value ?? throw new ArgumentNullException(nameof(options));
+        _memoryCache = memoryCache ?? throw new ArgumentNullException(nameof(memoryCache));
         
         // Validate configuration
         if (_options.Security?.ApiTokens == null)
@@ -76,20 +80,32 @@ public sealed class TokenAuthenticationService : ITokenAuthenticationService
             return false;
         }
 
-        // Token format kontrolü
+        // Üretilen token mı kontrol et (tk_ prefix'i ile başlıyorsa)
+        if (token.StartsWith("tk_"))
+        {
+            // Üretilen token'lar için memory cache'den kontrol et
+            var isGeneratedTokenValid = ValidateGeneratedToken(token);
+            if (isGeneratedTokenValid)
+            {
+                _logger.LogDebug("Generated token validation successful");
+                return true;
+            }
+        }
+
+        // Token format kontrolü (appsettings token'ları için)
         if (!IsValidTokenFormat(token))
         {
             _logger.LogWarning("Invalid token format received");
             return false;
         }
 
-        // Token'ı hash'le ve karşılaştır
+        // Token'ı hash'le ve karşılaştır (appsettings token'ları için)
         var hashedToken = HashToken(token);
         var isValid = _hashedTokens.Contains(hashedToken);
 
         if (isValid)
         {
-            _logger.LogDebug("Token validation successful");
+            _logger.LogDebug("Appsettings token validation successful");
         }
         else
         {
@@ -152,5 +168,28 @@ public sealed class TokenAuthenticationService : ITokenAuthenticationService
     public bool IsAuthenticationRequired()
     {
         return _options.Security.RequireAuth;
+    }
+
+    /// <summary>
+    /// Üretilen token'ı validate eder
+    /// </summary>
+    /// <param name="token">Validate edilecek token</param>
+    /// <returns>Token geçerli ise true</returns>
+    private bool ValidateGeneratedToken(string token)
+    {
+        try
+        {
+            // TokenGeneratorService ile aynı cache key format'ını kullan
+            var cacheKey = $"generated_token_{token}";
+            var isValid = _memoryCache.TryGetValue(cacheKey, out _);
+
+            _logger.LogDebug("Generated token validation result: {IsValid} for token: {Token}", isValid, token);
+            return isValid;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error validating generated token: {Token}", token);
+            return false;
+        }
     }
 } 

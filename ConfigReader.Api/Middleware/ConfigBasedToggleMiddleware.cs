@@ -23,6 +23,14 @@ public sealed class ConfigBasedToggleMiddleware
         "/api/configuration/appsettings"
     };
 
+    /// <summary>
+    /// Toggle kontrolü yapılmayacak endpoint'ler (token endpoint'leri)
+    /// </summary>
+    private static readonly string[] ExcludedEndpoints = 
+    {
+        "/api/token"
+    };
+
     public ConfigBasedToggleMiddleware(
         RequestDelegate next,
         ILogger<ConfigBasedToggleMiddleware> logger,
@@ -68,6 +76,13 @@ public sealed class ConfigBasedToggleMiddleware
     {
         if (string.IsNullOrEmpty(path))
             return false;
+
+        // Excluded endpoint'leri kontrol et
+        if (ExcludedEndpoints.Any(endpoint => 
+            path.StartsWith(endpoint, StringComparison.OrdinalIgnoreCase)))
+        {
+            return false;
+        }
 
         return ToggleEndpoints.Any(endpoint => 
             path.StartsWith(endpoint, StringComparison.OrdinalIgnoreCase));
