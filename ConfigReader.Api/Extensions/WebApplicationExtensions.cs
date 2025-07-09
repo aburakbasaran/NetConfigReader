@@ -1,3 +1,5 @@
+using ConfigReader.Api.Middleware;
+
 namespace ConfigReader.Api.Extensions;
 
 /// <summary>
@@ -26,8 +28,20 @@ public static class WebApplicationExtensions
         // Security
         app.UseHttpsRedirection();
 
+        // Config-based toggle (en başta olmalı)
+        app.UseMiddleware<ConfigBasedToggleMiddleware>();
+
+        // Sensitive endpoint logging middleware
+        app.UseMiddleware<SensitiveEndpointLoggingMiddleware>();
+
         // CORS
         app.UseCors("DefaultPolicy");
+
+        // Rate limiting
+        app.UseMiddleware<RateLimitMiddleware>();
+
+        // Token authentication
+        app.UseMiddleware<TokenAuthenticationMiddleware>();
 
         // Authentication & Authorization
         app.UseAuthentication();

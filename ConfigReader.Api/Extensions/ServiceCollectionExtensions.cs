@@ -1,3 +1,4 @@
+using ConfigReader.Api.Models;
 using ConfigReader.Api.Services;
 using System.Reflection;
 using System.Text.Json.Serialization;
@@ -48,11 +49,17 @@ public static class ServiceCollectionExtensions
             }
         });
 
+        // Configuration options
+        services.Configure<ConfigReaderApiOptions>(configuration.GetSection(ConfigReaderApiOptions.SectionName));
+
         // Health checks
         services.AddHealthChecks();
 
         // Application services
         services.AddScoped<IConfigurationService, ConfigurationService>();
+        services.AddSingleton<IRateLimitService, RateLimitService>();
+        services.AddScoped<IDataMaskingService, DataMaskingService>();
+        services.AddSingleton<ITokenAuthenticationService, TokenAuthenticationService>();
 
         // CORS yapılandırması - Production için güvenli
         services.AddCors(options =>

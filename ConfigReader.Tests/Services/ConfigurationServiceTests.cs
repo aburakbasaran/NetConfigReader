@@ -14,13 +14,20 @@ public sealed class ConfigurationServiceTests
 {
     private readonly Mock<IConfiguration> _configurationMock;
     private readonly Mock<ILogger<ConfigurationService>> _loggerMock;
+    private readonly Mock<IDataMaskingService> _dataMaskingServiceMock;
     private readonly ConfigurationService _configurationService;
 
     public ConfigurationServiceTests()
     {
         _configurationMock = new Mock<IConfiguration>();
         _loggerMock = new Mock<ILogger<ConfigurationService>>();
-        _configurationService = new ConfigurationService(_configurationMock.Object, _loggerMock.Object);
+        _dataMaskingServiceMock = new Mock<IDataMaskingService>();
+        
+        // Default masking behavior - return value as is
+        _dataMaskingServiceMock.Setup(x => x.MaskValue(It.IsAny<string?>()))
+            .Returns((string? value) => value ?? string.Empty);
+        
+        _configurationService = new ConfigurationService(_configurationMock.Object, _loggerMock.Object, _dataMaskingServiceMock.Object);
     }
 
     [Fact]
@@ -99,7 +106,7 @@ public sealed class ConfigurationServiceTests
             })
             .Build();
 
-        var service = new ConfigurationService(configurationRoot, _loggerMock.Object);
+        var service = new ConfigurationService(configurationRoot, _loggerMock.Object, _dataMaskingServiceMock.Object);
         
         // Act
         var result = await service.GetAppSettingsAsync();
@@ -123,7 +130,7 @@ public sealed class ConfigurationServiceTests
             })
             .Build();
 
-        var service = new ConfigurationService(configurationRoot, _loggerMock.Object);
+        var service = new ConfigurationService(configurationRoot, _loggerMock.Object, _dataMaskingServiceMock.Object);
         
         // Act
         var result = await service.GetAllConfigurationsAsync();
@@ -176,7 +183,7 @@ public sealed class ConfigurationServiceTests
     {
         // Arrange
         var emptyConfiguration = new ConfigurationBuilder().Build();
-        var service = new ConfigurationService(emptyConfiguration, _loggerMock.Object);
+        var service = new ConfigurationService(emptyConfiguration, _loggerMock.Object, _dataMaskingServiceMock.Object);
         
         // Act
         var result = await service.GetAppSettingsAsync();
@@ -190,10 +197,13 @@ public sealed class ConfigurationServiceTests
     public void ConfigurationService_Constructor_WithNullArguments_ThrowsArgumentNullException()
     {
         // Arrange & Act & Assert
-        var configurationAction = () => new ConfigurationService(null!, _loggerMock.Object);
+        var configurationAction = () => new ConfigurationService(null!, _loggerMock.Object, _dataMaskingServiceMock.Object);
         configurationAction.Should().Throw<ArgumentNullException>();
         
-        var loggerAction = () => new ConfigurationService(_configurationMock.Object, null!);
+        var loggerAction = () => new ConfigurationService(_configurationMock.Object, null!, _dataMaskingServiceMock.Object);
         loggerAction.Should().Throw<ArgumentNullException>();
+        
+        var dataMaskingAction = () => new ConfigurationService(_configurationMock.Object, _loggerMock.Object, null!);
+        dataMaskingAction.Should().Throw<ArgumentNullException>();
     }
 } 

@@ -11,11 +11,16 @@ public sealed class ConfigurationService : IConfigurationService
 {
     private readonly IConfiguration _configuration;
     private readonly ILogger<ConfigurationService> _logger;
+    private readonly IDataMaskingService _dataMaskingService;
 
-    public ConfigurationService(IConfiguration configuration, ILogger<ConfigurationService> logger)
+    public ConfigurationService(
+        IConfiguration configuration, 
+        ILogger<ConfigurationService> logger,
+        IDataMaskingService dataMaskingService)
     {
         _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _dataMaskingService = dataMaskingService ?? throw new ArgumentNullException(nameof(dataMaskingService));
     }
 
     /// <summary>
@@ -73,10 +78,13 @@ public sealed class ConfigurationService : IConfigurationService
             // Kaynağı belirle
             var source = DetermineSource(key);
             
+            // Production masking uygula
+            var maskedValue = _dataMaskingService.MaskValue(value);
+            
             var result = new ConfigurationItem
             {
                 Key = key,
-                Value = value,
+                Value = maskedValue,
                 Source = source
             };
 
@@ -100,11 +108,18 @@ public sealed class ConfigurationService : IConfigurationService
             var environmentVariables = Environment.GetEnvironmentVariables()
                 .Cast<System.Collections.DictionaryEntry>()
                 .Where(kvp => !string.IsNullOrEmpty(kvp.Key?.ToString()))
-                .Select(kvp => new ConfigurationItem
+                .Select(kvp => 
                 {
-                    Key = kvp.Key!.ToString()!,
-                    Value = kvp.Value?.ToString(),
-                    Source = ConfigurationSource.Environment
+                    var key = kvp.Key!.ToString()!;
+                    var value = kvp.Value?.ToString();
+                    var maskedValue = _dataMaskingService.MaskValue(value);
+                    
+                    return new ConfigurationItem
+                    {
+                        Key = key,
+                        Value = maskedValue,
+                        Source = ConfigurationSource.Environment
+                    };
                 })
                 .ToList();
 
@@ -150,6 +165,9 @@ public sealed class ConfigurationService : IConfigurationService
             return appSettings;
         }
 
+        // Performance: Use HashSet for faster lookups
+        var processedKeys = new HashSet<string>();
+
         foreach (var provider in configurationRoot.Providers.Reverse())
         {
             var keys = GetAllKeysFromProvider(provider);
@@ -158,14 +176,18 @@ public sealed class ConfigurationService : IConfigurationService
             {
                 if (provider.TryGet(key, out var value) && 
                     !IsEnvironmentVariable(key) && 
-                    !appSettings.Any(x => x.Key == key))
+                    !processedKeys.Contains(key))
                 {
+                    var maskedValue = _dataMaskingService.MaskValue(value);
+                    
                     appSettings.Add(new ConfigurationItem
                     {
                         Key = key,
-                        Value = value,
+                        Value = maskedValue,
                         Source = ConfigurationSource.AppSettings
                     });
+                    
+                    processedKeys.Add(key);
                 }
             }
         }

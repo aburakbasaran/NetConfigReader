@@ -14,6 +14,12 @@ Bu proje, .NET 8 ile geliştirilmiş bir API'dir. Uygulama çeşitli ortamlarda 
 - ✅ Dependency Injection
 - ✅ Logging desteği
 - ✅ CORS desteği
+- 🔒 **Güvenlik Özellikleri**
+  - Rate limiting (günlük 10 istek/endpoint)
+  - Token-based authentication
+  - Production data masking
+  - Sensitive endpoint logging protection
+  - Config-based API enable/disable
 
 ## Teknolojiler
 
@@ -24,6 +30,8 @@ Bu proje, .NET 8 ile geliştirilmiş bir API'dir. Uygulama çeşitli ortamlarda 
 - FluentAssertions (Test assertions)
 - Swagger/OpenAPI
 - Microsoft.AspNetCore.Mvc.Testing
+- System.Security.Cryptography (SHA256 hashing)
+- Custom middleware pipeline (Authentication, Rate limiting, etc.)
 
 ## Proje Yapısı
 
@@ -34,9 +42,24 @@ ConfigReader/
 │   │   └── ConfigurationController.cs
 │   ├── Services/                     # Business logic
 │   │   ├── IConfigurationService.cs
-│   │   └── ConfigurationService.cs
+│   │   ├── ConfigurationService.cs
+│   │   ├── IRateLimitService.cs
+│   │   ├── RateLimitService.cs
+│   │   ├── IDataMaskingService.cs
+│   │   ├── DataMaskingService.cs
+│   │   ├── ITokenAuthenticationService.cs
+│   │   └── TokenAuthenticationService.cs
 │   ├── Models/                       # Data models
-│   │   └── ConfigurationItem.cs
+│   │   ├── ConfigurationItem.cs
+│   │   └── ConfigReaderApiOptions.cs
+│   ├── Middleware/                   # Custom middleware
+│   │   ├── RateLimitMiddleware.cs
+│   │   ├── TokenAuthenticationMiddleware.cs
+│   │   ├── ConfigBasedToggleMiddleware.cs
+│   │   └── SensitiveEndpointLoggingMiddleware.cs
+│   ├── Extensions/                   # Extension methods
+│   │   ├── ServiceCollectionExtensions.cs
+│   │   └── WebApplicationExtensions.cs
 │   ├── Program.cs                    # Uygulama giriş noktası
 │   ├── appsettings.json             # Production ayarları
 │   └── appsettings.Development.json  # Development ayarları
@@ -44,7 +67,10 @@ ConfigReader/
 │   ├── Controllers/                  # Controller testleri
 │   │   └── ConfigurationControllerTests.cs
 │   └── Services/                     # Service testleri
-│       └── ConfigurationServiceTests.cs
+│       ├── ConfigurationServiceTests.cs
+│       ├── RateLimitServiceTests.cs
+│       ├── DataMaskingServiceTests.cs
+│       └── TokenAuthenticationServiceTests.cs
 ├── ConfigReader.sln                  # Solution dosyası
 └── README.md                         # Bu dosya
 ```
@@ -87,6 +113,53 @@ Tüm endpoint'ler aşağıdaki format'ta JSON döner:
 }
 ```
 
+## 🔒 Güvenlik Özellikleri
+
+### 1. Token-Based Authentication
+API, güvenli token-based authentication kullanır:
+
+```bash
+# Header ile token gönderme
+curl -H "X-ConfigReader-Token: your-token-here" https://localhost:7000/api/configuration
+```
+
+**Konfigürasyon:** `appsettings.json`
+```json
+{
+  "ConfigReaderApi": {
+    "Security": {
+      "RequireAuth": true,
+      "ApiTokens": ["your-secure-token-here"]
+    }
+  }
+}
+```
+
+### 2. Rate Limiting
+- Günlük 10 istek sınırı (endpoint bazında)
+- IP adresi bazında takip
+- Otomatik cleanup
+
+### 3. Production Data Masking
+Production ortamında hassas veriler maskelenir:
+- Format: `first5...last5`
+- Connection string'ler, API key'ler maskelenir
+- Development'ta masking devre dışı
+
+### 4. Sensitive Endpoint Logging
+- API response'ları asla loglanmaz
+- Sadece temel request bilgileri log'lanır
+- Hassas veri sızıntısı önlenir
+
+### 5. Config-Based Toggle
+```json
+{
+  "ConfigReaderApi": {
+    "IsEnabled": true  // API'yi tamamen devre dışı bırakır
+  }
+}
+```
+
 ## Kurulum ve Çalıştırma
 
 ### Gereksinimler
@@ -106,6 +179,24 @@ dotnet build
 
 # Testleri çalıştır
 dotnet test
+```
+
+### Güvenlik Konfigürasyonu
+`appsettings.json` dosyasında güvenlik ayarlarını yapın:
+
+```json
+{
+  "ConfigReaderApi": {
+    "IsEnabled": true,
+    "Security": {
+      "RequireAuth": true,
+      "EnableRateLimit": true,
+      "EnableResponseMasking": true,
+      "ApiTokens": ["your-secure-token-here"],
+      "TokenHeaderName": "X-ConfigReader-Token"
+    }
+  }
+}
 ```
 
 ### Çalıştırma
@@ -136,6 +227,20 @@ dotnet test --verbosity normal
 
 # Coverage raporu (opsiyonel)
 dotnet test --collect:"XPlat Code Coverage"
+```
+
+### Güvenlik Testleri
+```bash
+# Rate limiting testi
+for i in {1..15}; do curl -H "X-ConfigReader-Token: your-token" https://localhost:7000/api/configuration; done
+
+# Authentication testi
+curl https://localhost:7000/api/configuration  # 401 Unauthorized
+curl -H "X-ConfigReader-Token: invalid-token" https://localhost:7000/api/configuration  # 401 Unauthorized
+
+# API toggle testi
+# appsettings.json'da IsEnabled: false yapın ve API'yi yeniden başlatın
+curl https://localhost:7000/api/configuration  # 503 Service Unavailable
 ```
 
 ## Swagger/OpenAPI Dokumentasyonu
