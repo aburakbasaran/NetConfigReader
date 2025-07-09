@@ -184,3 +184,4 @@ MIT License
 - Unit testler ve integration testler eklenmiştir
 - XML documentation desteği mevcuttur # NetConfigReader
 # NetConfigReader
+# NetConfigReader
