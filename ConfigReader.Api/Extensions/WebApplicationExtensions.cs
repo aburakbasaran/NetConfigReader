@@ -14,7 +14,13 @@ public static class WebApplicationExtensions
     /// <returns>WebApplication</returns>
     public static WebApplication ConfigurePipeline(this WebApplication app)
     {
-        // Development environment
+        // Security - HTTPS redirect development'ta kapalı
+        if (!app.Environment.IsDevelopment())
+        {
+            app.UseHttpsRedirection();
+        }
+
+        // Development environment - Swagger en başta olmalı
         if (app.Environment.IsDevelopment())
         {
             app.UseSwagger();
@@ -25,22 +31,19 @@ public static class WebApplicationExtensions
             });
         }
 
-        // Security
-        app.UseHttpsRedirection();
-
-        // Config-based toggle (en başta olmalı)
+        // Config-based toggle (sadece API endpoint'leri için)
         app.UseMiddleware<ConfigBasedToggleMiddleware>();
 
-        // Sensitive endpoint logging middleware
+        // Sensitive endpoint logging middleware (sadece API endpoint'leri için)
         app.UseMiddleware<SensitiveEndpointLoggingMiddleware>();
 
         // CORS
         app.UseCors("DefaultPolicy");
 
-        // Rate limiting
+        // Rate limiting (sadece API endpoint'leri için)
         app.UseMiddleware<RateLimitMiddleware>();
 
-        // Token authentication
+        // Token authentication (sadece API endpoint'leri için)
         app.UseMiddleware<TokenAuthenticationMiddleware>();
 
         // Authentication & Authorization
