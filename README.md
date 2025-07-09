@@ -183,3 +183,4 @@ MIT License
 - Error handling tüm endpoint'lerde mevcuttur
 - Unit testler ve integration testler eklenmiştir
 - XML documentation desteği mevcuttur # NetConfigReader
+# NetConfigReader
