@@ -182,4 +182,4 @@ MIT License
 - Logging Microsoft.Extensions.Logging ile yapılmıştır
 - Error handling tüm endpoint'lerde mevcuttur
 - Unit testler ve integration testler eklenmiştir
-- XML documentation desteği mevcuttur 
+- XML documentation desteği mevcuttur # NetConfigReader
