@@ -1,0 +1,6 @@
+@ConfigReader.Api_HostAddress = http://localhost:5193
+
+GET {{ConfigReader.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
