@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace ConfigReader.Api.Models;
 
 /// <summary>
@@ -23,6 +25,7 @@ public sealed class ConfigReaderApiOptions
     /// <summary>
     /// Güvenlik ayarları
     /// </summary>
+    [Required]
     public SecurityOptions Security { get; set; } = new();
 }
 
@@ -54,5 +57,17 @@ public sealed class SecurityOptions
     /// <summary>
     /// Token header adı
     /// </summary>
+    [Required]
+    [MinLength(1)]
     public string TokenHeaderName { get; set; } = "X-ConfigReader-Token";
+
+    /// <summary>
+    /// IP whitelist aktif mi
+    /// </summary>
+    public bool EnableIpWhitelist { get; set; } = false;
+
+    /// <summary>
+    /// İzin verilen IP aralıkları (CIDR formatında)
+    /// </summary>
+    public string[] AllowedIpRanges { get; set; } = Array.Empty<string>();
 } 

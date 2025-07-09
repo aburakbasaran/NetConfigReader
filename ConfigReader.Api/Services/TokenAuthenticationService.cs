@@ -181,10 +181,32 @@ public sealed class TokenAuthenticationService : ITokenAuthenticationService
         {
             // TokenGeneratorService ile aynı cache key format'ını kullan
             var cacheKey = $"generated_token_{token}";
-            var isValid = _memoryCache.TryGetValue(cacheKey, out _);
+            
+            if (!_memoryCache.TryGetValue(cacheKey, out var cacheValue))
+            {
+                _logger.LogDebug("Generated token not found in cache: {Token}", token);
+                return false;
+            }
 
-            _logger.LogDebug("Generated token validation result: {IsValid} for token: {Token}", isValid, token);
-            return isValid;
+            // Cache'deki token bilgilerini kontrol et
+            if (cacheValue != null)
+            {
+                // Anonymous object'ten property'leri al
+                var tokenInfo = cacheValue.GetType().GetProperty("ExpiresAt")?.GetValue(cacheValue);
+                var isActive = cacheValue.GetType().GetProperty("IsActive")?.GetValue(cacheValue);
+                
+                if (tokenInfo is DateTime expiresAt && isActive is bool active)
+                {
+                    // Token aktif mi ve süresi dolmamış mı kontrol et
+                    var isValid = active && expiresAt > DateTime.UtcNow;
+                    _logger.LogDebug("Generated token validation result: {IsValid} for token: {Token} (ExpiresAt: {ExpiresAt}, IsActive: {IsActive})", 
+                        isValid, token, expiresAt, active);
+                    return isValid;
+                }
+            }
+
+            _logger.LogDebug("Generated token validation failed - invalid cache data for token: {Token}", token);
+            return false;
         }
         catch (Exception ex)
         {

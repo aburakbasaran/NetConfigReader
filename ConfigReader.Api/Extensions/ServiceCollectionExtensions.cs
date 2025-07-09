@@ -49,8 +49,11 @@ public static class ServiceCollectionExtensions
             }
         });
 
-        // Configuration options
-        services.Configure<ConfigReaderApiOptions>(configuration.GetSection(ConfigReaderApiOptions.SectionName));
+        // Configuration options with validation
+        services.Configure<ConfigReaderApiOptions>(configuration.GetSection(ConfigReaderApiOptions.SectionName))
+                .AddOptionsWithValidateOnStart<ConfigReaderApiOptions>()
+                .BindConfiguration(ConfigReaderApiOptions.SectionName)
+                .ValidateDataAnnotations();
 
         // Health checks
         services.AddHealthChecks();
@@ -64,6 +67,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IDataMaskingService, DataMaskingService>();
         services.AddSingleton<ITokenAuthenticationService, TokenAuthenticationService>();
         services.AddSingleton<ITokenGeneratorService, TokenGeneratorService>();
+        services.AddSingleton<IIpWhitelistService, IpWhitelistService>();
 
         // CORS yapılandırması - Production için güvenli
         services.AddCors(options =>

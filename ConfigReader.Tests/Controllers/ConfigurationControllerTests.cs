@@ -1,7 +1,9 @@
 using ConfigReader.Api.Models;
 using FluentAssertions;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.DependencyInjection;
 using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -16,10 +18,21 @@ public sealed class ConfigurationControllerTests : IClassFixture<WebApplicationF
     private readonly WebApplicationFactory<Program> _factory;
     private readonly HttpClient _client;
     private readonly JsonSerializerOptions _jsonOptions;
+    private const string TestToken = "test-token-12345678901234567890123456789012";
 
     public ConfigurationControllerTests(WebApplicationFactory<Program> factory)
     {
-        _factory = factory;
+        _factory = factory.WithWebHostBuilder(builder =>
+        {
+            builder.ConfigureServices(services =>
+            {
+                // Test için authentication'ı disable et
+                services.Configure<ConfigReader.Api.Models.ConfigReaderApiOptions>(options =>
+                {
+                    options.Security.RequireAuth = false;
+                });
+            });
+        });
         _client = _factory.CreateClient();
         _jsonOptions = new JsonSerializerOptions
         {

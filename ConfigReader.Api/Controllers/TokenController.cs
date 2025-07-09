@@ -27,13 +27,13 @@ public class TokenController : ControllerBase
     /// <summary>
     /// Yeni token üretir (sadece development ortamında)
     /// </summary>
-    /// <param name="expiryMinutes">Token'ın geçerlilik süresi (dakika), varsayılan: 60</param>
+    /// <param name="expiryMinutes">Token'ın geçerlilik süresi (dakika), varsayılan: 1</param>
     /// <returns>Üretilen token bilgisi</returns>
     [HttpPost("generate")]
     [ProducesResponseType(typeof(TokenResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public async Task<IActionResult> GenerateToken([FromQuery] int expiryMinutes = 60)
+    public async Task<IActionResult> GenerateToken([FromQuery] int expiryMinutes = 1)
     {
         // Sadece development ortamında çalışsın
         if (!_environment.IsDevelopment())

@@ -31,6 +31,9 @@ public static class WebApplicationExtensions
             });
         }
 
+        // IP whitelist (en yüksek öncelik - güvenlik için)
+        app.UseMiddleware<IpWhitelistMiddleware>();
+
         // Config-based toggle (sadece API endpoint'leri için)
         app.UseMiddleware<ConfigBasedToggleMiddleware>();
 

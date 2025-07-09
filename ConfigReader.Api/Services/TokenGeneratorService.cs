@@ -28,8 +28,11 @@ public sealed class TokenGeneratorService : ITokenGeneratorService
     /// </summary>
     /// <param name="expiryMinutes">Token'ın geçerlilik süresi (dakika)</param>
     /// <returns>Üretilen token</returns>
-    public async Task<string> GenerateTokenAsync(int expiryMinutes = 60)
+    public Task<string> GenerateTokenAsync(int expiryMinutes = 1)
     {
+        // Eski token'ları temizle (sadece aktif olanları - expired'ları zaten otomatik silinir)
+        CleanupActiveTokens();
+
         var token = GenerateSecureToken();
         var expiryTime = DateTime.UtcNow.AddMinutes(expiryMinutes);
         
@@ -37,7 +40,7 @@ public sealed class TokenGeneratorService : ITokenGeneratorService
         var cacheOptions = new MemoryCacheEntryOptions
         {
             AbsoluteExpiration = expiryTime,
-            SlidingExpiration = TimeSpan.FromMinutes(expiryMinutes / 2), // Sliding expiration
+            SlidingExpiration = TimeSpan.FromMinutes(Math.Max(expiryMinutes / 2, 0.5)), // Minimum 30 saniye
             Priority = CacheItemPriority.High
         };
 
@@ -55,7 +58,43 @@ public sealed class TokenGeneratorService : ITokenGeneratorService
         _logger.LogInformation("Token üretildi: {Token}, Expiry: {Expiry}", 
             token, expiryTime.ToString("yyyy-MM-dd HH:mm:ss"));
 
-        return token;
+        return Task.FromResult(token);
+    }
+
+    /// <summary>
+    /// Aktif token'ları temizler (yeni token üretilirken eski aktif token'ları siler)
+    /// </summary>
+    private void CleanupActiveTokens()
+    {
+        var now = DateTime.UtcNow;
+        var tokensToRemove = new List<string>();
+
+        foreach (var kvp in _tokenTracker)
+        {
+            var token = kvp.Key;
+            var expiryTime = kvp.Value;
+
+            // Süresi dolmuş token'ları ve aktif token'ları temizle
+            var cacheKey = TokenPrefix + token;
+            if (_memoryCache.TryGetValue(cacheKey, out TokenInfo? tokenInfo) && tokenInfo != null)
+            {
+                // Yeni token üretilirken tüm eski token'ları sil
+                tokensToRemove.Add(token);
+            }
+        }
+
+        // Token'ları sil
+        foreach (var token in tokensToRemove)
+        {
+            var cacheKey = TokenPrefix + token;
+            _memoryCache.Remove(cacheKey);
+            _tokenTracker.TryRemove(token, out _);
+        }
+
+        if (tokensToRemove.Count > 0)
+        {
+            _logger.LogInformation("Temizlenen token sayısı: {Count}", tokensToRemove.Count);
+        }
     }
 
     /// <summary>
@@ -63,11 +102,11 @@ public sealed class TokenGeneratorService : ITokenGeneratorService
     /// </summary>
     /// <param name="token">Kontrol edilecek token</param>
     /// <returns>Token geçerli ise true</returns>
-    public async Task<bool> IsTokenValidAsync(string token)
+    public Task<bool> IsTokenValidAsync(string token)
     {
         if (string.IsNullOrWhiteSpace(token))
         {
-            return false;
+            return Task.FromResult(false);
         }
 
         var cacheKey = TokenPrefix + token;
@@ -90,11 +129,11 @@ public sealed class TokenGeneratorService : ITokenGeneratorService
                 _tokenTracker.TryRemove(token, out _);
             }
 
-            return isValid;
+            return Task.FromResult(isValid);
         }
 
         _logger.LogDebug("Token cache'de bulunamadı: {Token}", token);
-        return false;
+        return Task.FromResult(false);
     }
 
     /// <summary>
@@ -102,11 +141,11 @@ public sealed class TokenGeneratorService : ITokenGeneratorService
     /// </summary>
     /// <param name="token">Kaldırılacak token</param>
     /// <returns>Task</returns>
-    public async Task RevokeTokenAsync(string token)
+    public Task RevokeTokenAsync(string token)
     {
         if (string.IsNullOrWhiteSpace(token))
         {
-            return;
+            return Task.CompletedTask;
         }
 
         var cacheKey = TokenPrefix + token;
@@ -114,13 +153,14 @@ public sealed class TokenGeneratorService : ITokenGeneratorService
         _tokenTracker.TryRemove(token, out _);
 
         _logger.LogInformation("Token iptal edildi: {Token}", token);
+        return Task.CompletedTask;
     }
 
     /// <summary>
     /// Tüm aktif token'ları listeler
     /// </summary>
     /// <returns>Aktif token listesi</returns>
-    public async Task<List<string>> GetActiveTokensAsync()
+    public Task<List<string>> GetActiveTokensAsync()
     {
         var activeTokens = new List<string>();
         var now = DateTime.UtcNow;
@@ -146,7 +186,7 @@ public sealed class TokenGeneratorService : ITokenGeneratorService
             }
         }
 
-        return activeTokens;
+        return Task.FromResult(activeTokens);
     }
 
     /// <summary>
